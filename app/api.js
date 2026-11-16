@@ -1,13 +1,14 @@
 // make.fun's public API: read-only GET requests, open to any origin (CORS).
 // The full API is described at https://make.fun/api/openapi.json.
 //
-// Responses are cached in sessionStorage and revalidated against the server's
-// ETag (the data changes about once a minute): a navigation that sees the same
-// data gets a 304 and reuses the cached body instead of downloading it again,
-// and a failed network still renders the last cached body.
+// Responses are cached in sessionStorage keyed by URL with a 60-second TTL,
+// and concurrent requests for the same URL are deduped so only one network
+// call is in flight at a time. A failed network still renders the last cached
+// body, even after its TTL has expired.
 
 const API = 'https://make.fun/api';
 const PREFIX = 'makefun:';
+const TTL = 60 * 1000; // 60 seconds
 
 function read(key) {
   try {
@@ -30,25 +31,36 @@ function write(key, value) {
   }
 }
 
+const inflight = new Map();
+
 async function get(path) {
   const cached = read(path);
-  const headers = {};
-  if (cached?.etag) headers['If-None-Match'] = cached.etag;
+  if (cached && Date.now() - cached.ts < TTL) return cached.body;
 
-  let res;
+  const pending = inflight.get(path);
+  if (pending) return pending;
+
+  const request = (async () => {
+    let res;
+    try {
+      res = await fetch(API + path);
+    } catch {
+      if (cached) return cached.body;
+      throw new Error('network');
+    }
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const body = await res.json();
+    write(path, { ts: Date.now(), body });
+    return body;
+  })();
+
+  inflight.set(path, request);
   try {
-    res = await fetch(API + path, { headers });
-  } catch {
-    if (cached) return cached.body;
-    throw new Error('network');
+    return await request;
+  } finally {
+    inflight.delete(path);
   }
-
-  if (res.status === 304) return cached.body;
-
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const body = await res.json();
-  write(path, { etag: res.headers.get('ETag'), body });
-  return body;
 }
 
 /** The open bounties: { items: [...], next_cursor }. */

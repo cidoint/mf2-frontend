@@ -118,33 +118,80 @@ function md(src) {
 
 /* --- the board --- */
 
-export function board(data) {
-  const items = data.items ?? [];
-  const rows = items
-    .map((b) => {
-      const f = fee(b);
-      const live = livePot(b);
-      return `
+let boardItems = [];
+
+/** A sortable metric for a board row. */
+function boardMetric(b, key) {
+  if (key === 'entries') return count(b.submissionCount);
+  if (key === 'time') return b.deadline ? new Date(b.deadline).getTime() : Infinity;
+  return Number(b.potUsd ?? b.rewardAmount) || 0;
+}
+
+function boardRow(b) {
+  const f = fee(b);
+  const live = livePot(b);
+  return `
       <li>
         <span class="title">
           <a href="#/bounty/${encodeURIComponent(b.slug)}">${esc(b.title)}</a>
           <span class="cat">${esc(b.category ?? '')}</span>
         </span>
-        <span class="num">${pot(b)}${live ? ' <span class="tag">live</span>' : ''}</span>
-        <span class="num">${f || 'free'}</span>
-        <span class="time">${timeLeft(b.deadline)}</span>
-        <span class="num">${count(b.submissionCount)}</span>
+        <span class="num reward" data-label="Reward">${pot(b)}${live ? ' <span class="tag">live</span>' : ''}</span>
+        <span class="num fee" data-label="Entry fee">${f || 'free'}</span>
+        <span class="time" data-label="Time left">${timeLeft(b.deadline)}</span>
+        <span class="num entries" data-label="Entries">${count(b.submissionCount)}</span>
       </li>`;
-    })
-    .join('');
+}
 
+export function board(data) {
+  boardItems = data.items ?? [];
   return `
     <h1>Open bounties</h1>
+    <div class="controls">
+      <input type="search" id="board-search" placeholder="Search bounties…" autocomplete="off" aria-label="Search bounties">
+      <select id="board-sort" aria-label="Sort bounties">
+        <option value="reward">Highest reward</option>
+        <option value="entries">Most entries</option>
+        <option value="time">Ending soonest</option>
+      </select>
+    </div>
     <div class="board-head" aria-hidden="true">
       <span>Bounty</span><span class="num">Reward / pot</span><span class="num">Entry fee</span><span>Time left</span><span class="num">Entries</span>
     </div>
-    <ul class="board">${rows}</ul>
-    ${items.length ? '' : '<p>No open bounties right now.</p>'}`;
+    <ul class="board" id="board-list"></ul>
+    <p class="muted board-empty" id="board-empty" hidden></p>`;
+}
+
+function bindBoard(root) {
+  const list = root.querySelector('#board-list');
+  const search = root.querySelector('#board-search');
+  const sort = root.querySelector('#board-sort');
+  const empty = root.querySelector('#board-empty');
+  if (!list || !search || !sort || !empty) return;
+
+  const hay = (b) => `${b.title} ${b.category ?? ''} ${b.slug ?? ''}`.toLowerCase();
+
+  const render = () => {
+    const q = search.value.trim().toLowerCase();
+    const key = sort.value;
+    const items = boardItems
+      .filter((b) => !q || hay(b).includes(q))
+      .sort((a, b) => {
+        const av = boardMetric(a, key);
+        const bv = boardMetric(b, key);
+        return key === 'time' ? av - bv : bv - av;
+      });
+    list.innerHTML = items.map(boardRow).join('');
+
+    const none = items.length === 0;
+    empty.hidden = !none;
+    empty.textContent =
+      boardItems.length === 0 ? 'No open bounties right now.' : 'No bounties match your search.';
+  };
+
+  search.addEventListener('input', render);
+  sort.addEventListener('change', render);
+  render();
 }
 
 /* --- one bounty --- */
@@ -162,14 +209,13 @@ export function bounty(b) {
       <dt>Reward</dt><dd>${pot(b)}${live ? ' <span class="tag">live pot</span>' : ''}</dd>
       ${f ? `<dt>Entry fee</dt><dd>${f} <span class="muted">· ${count(b.entryFeePayers)} paid</span></dd>` : ''}
       <dt>Entries</dt><dd>${count(b.submissionCount)}</dd>
-      <dt>Opened</dt><dd>${date(b.opensAt ?? b.publishedAt)}</dd>
-      <dt>Deadline</dt><dd>${date(b.deadline)} · ${timeLeft(b.deadline)}</dd>
       ${b.category ? `<dt>Category</dt><dd>${esc(b.category)}</dd>` : ''}
       ${b.sponsor?.name ? `<dt>Sponsor</dt><dd>${esc(b.sponsor.name)}</dd>` : ''}
     </dl>
 
     <p><a class="lb-link" href="#/bounty/${encodeURIComponent(b.slug)}/leaderboard">View leaderboard →</a></p>
 
+    ${dates(b)}
     ${rewards(b)}
 
     <h2>Description</h2>
@@ -177,10 +223,25 @@ export function bounty(b) {
     ${b.rules ? `<h2>Rules</h2><div class="prose">${md(b.rules)}</div>` : ''}`;
 }
 
+function dates(b) {
+  const opened = date(b.opensAt ?? b.publishedAt);
+  const deadline = date(b.deadline);
+  if (!b.opensAt && !b.publishedAt && !b.deadline) return '';
+  return `
+    <section class="dates">
+      <h2>Dates</h2>
+      <dl class="meta">
+        <dt>Opened</dt><dd>${opened}</dd>
+        <dt>Deadline</dt><dd>${deadline}${b.deadline ? ` <span class="muted">· ${timeLeft(b.deadline)}</span>` : ''}</dd>
+      </dl>
+    </section>`;
+}
+
 function rewards(b) {
   const live = livePot(b);
   const now = Array.isArray(b.rewardsNow) && b.rewardsNow.length ? b.rewardsNow : null;
 
+  let table;
   if (!now) {
     const map = b.rewards ?? {};
     const places = Object.keys(map).sort((x, y) => Number(x) - Number(y));
@@ -188,49 +249,55 @@ function rewards(b) {
     const rows = places
       .map((p) => `<tr><td>${ordinal(p)}</td><td class="num">${money(map[p])}</td></tr>`)
       .join('');
-    return `<h2>Rewards</h2><table class="rewards"><thead><tr><th>Place</th><th class="num">Prize</th></tr></thead><tbody>${rows}</tbody></table>`;
+    table = `<table class="rewards"><thead><tr><th>Place</th><th class="num">Prize</th></tr></thead><tbody>${rows}</tbody></table>`;
+  } else {
+    const rows = now
+      .map(
+        (r) => `
+        <tr>
+          <td>${ordinal(r.place)}</td>
+          <td class="num">${money(r.baseUsd)}</td>
+          ${live ? `<td class="num">+ ${money(r.feeShareUsd)}</td><td class="num live">${money(r.amountUsd)}</td>` : `<td class="num">${money(r.amountUsd)}</td>`}
+        </tr>`,
+      )
+      .join('');
+    table = `
+      <table class="rewards">
+        <thead><tr><th>Place</th><th class="num">Base</th>${live ? '<th class="num">Entry fees</th><th class="num">Live total</th>' : '<th class="num">Total</th>'}</tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
   }
-
-  const rows = now
-    .map(
-      (r) => `
-      <tr>
-        <td>${ordinal(r.place)}</td>
-        <td class="num">${money(r.baseUsd)}</td>
-        ${live ? `<td class="num">+ ${money(r.feeShareUsd)}</td><td class="num live">${money(r.amountUsd)}</td>` : `<td class="num">${money(r.amountUsd)}</td>`}
-      </tr>`,
-    )
-    .join('');
 
   return `
     <h2>Rewards${live ? ` <span class="muted">· live pot ${pot(b)}</span>` : ''}</h2>
-    <table class="rewards">
-      <thead><tr><th>Place</th><th class="num">Base</th>${live ? '<th class="num">Entry fees</th><th class="num">Live total</th>' : '<th class="num">Total</th>'}</tr></thead>
-      <tbody>${rows}</tbody>
-    </table>`;
+    <div class="table-wrap">${table}</div>`;
 }
 
 /* --- a bounty's leaderboard --- */
 
-export function leaderboard(data) {
-  const comp = data.competition ?? {};
-  const phase = data.phase ?? {};
-  const cols = (data.columns ?? []).filter((c) => !c.hidden);
-  const all = data.entries ?? [];
-  const shown = all.slice(0, 100);
-  const note = all.length > shown.length ? `Showing the top ${shown.length} of ${all.length} entries.` : '';
+const LB_PAGE = 50;
+let lbEntries = [];
+let lbCols = [];
+let lbShown = 0;
 
-  const rows = shown
-    .map(
-      (e) => `
+function lbRow(e) {
+  return `
       <tr>
         <td class="num rank">${e.rank ?? ''}</td>
         <td class="handle"><a href="#/account/${encodeURIComponent(e.handle)}">${esc(e.handle)}</a></td>
         <td class="entry">${esc(e.title ?? '')}</td>
-        ${cols.map((c) => `<td class="num">${cell(e, c)}</td>`).join('')}
-      </tr>`,
-    )
-    .join('');
+        ${lbCols.map((c) => `<td class="num">${cell(e, c)}</td>`).join('')}
+      </tr>`;
+}
+
+export function leaderboard(data) {
+  const comp = data.competition ?? {};
+  const phase = data.phase ?? {};
+  lbCols = (data.columns ?? []).filter((c) => !c.hidden);
+  lbEntries = data.entries ?? [];
+  lbShown = Math.min(LB_PAGE, lbEntries.length);
+
+  const rows = lbEntries.slice(0, lbShown).map(lbRow).join('');
 
   const phaseNote = [
     phase.scores === 'live' ? 'live scores' : '',
@@ -244,16 +311,39 @@ export function leaderboard(data) {
     <p class="crumb"><a href="#/bounty/${encodeURIComponent(comp.slug)}">← ${esc(comp.title)}</a></p>
     <h1>Leaderboard</h1>
     <p class="lb-meta">${esc(phase.title ?? '')}${phaseNote ? ` · ${esc(phaseNote)}` : ''}</p>
-    ${note ? `<p class="muted">${esc(note)}</p>` : ''}
+    <p class="muted lb-count">${lbEntries.length} ${lbEntries.length === 1 ? 'entry' : 'entries'}</p>
+    ${lbEntries.length > lbShown ? `<p class="muted lb-note" id="lb-note">Showing ${lbShown} of ${lbEntries.length} entries.</p>` : ''}
     <div class="table-wrap">
       <table class="leaderboard">
         <thead><tr>
           <th class="num">Rank</th><th>Handle</th><th>Entry</th>
-          ${cols.map((c) => `<th class="num">${esc(c.title)}</th>`).join('')}
+          ${lbCols.map((c) => `<th class="num">${esc(c.title)}</th>`).join('')}
         </tr></thead>
-        <tbody>${rows}</tbody>
+        <tbody id="lb-body">${rows}</tbody>
       </table>
-    </div>`;
+    </div>
+    ${lbEntries.length > lbShown ? `<p class="lb-actions"><button type="button" class="lb-more" id="lb-more">Show more</button></p>` : ''}`;
+}
+
+function bindLeaderboard(root) {
+  const more = root.querySelector('#lb-more');
+  if (!more) return;
+  const body = root.querySelector('#lb-body');
+  const note = root.querySelector('#lb-note');
+
+  more.addEventListener('click', () => {
+    const start = lbShown;
+    const next = lbEntries.slice(start, start + LB_PAGE);
+    lbShown += next.length;
+    body.insertAdjacentHTML('beforeend', next.map(lbRow).join(''));
+
+    if (lbShown >= lbEntries.length) {
+      more.closest('.lb-actions')?.remove();
+      if (note) note.textContent = `Showing all ${lbEntries.length} entries.`;
+    } else if (note) {
+      note.textContent = `Showing ${lbShown} of ${lbEntries.length} entries.`;
+    }
+  });
 }
 
 function cell(e, c) {
@@ -301,7 +391,7 @@ function payouts(p) {
       (x) => `
       <li>
         <span class="amount">${money(x.amount_usd)}</span>
-        <span>${ordinal(x.place)} place · ${esc(x.competition?.title ?? '')}</span>
+        <span class="desc">${ordinal(x.place)} place · ${esc(x.competition?.title ?? '')}</span>
         <span class="muted">${date(x.paid_at)}</span>
       </li>`,
     )
@@ -322,4 +412,10 @@ function entries(p) {
     )
     .join('');
   return `<h2>Entries (${list.length})</h2><ul class="list entries">${rows}</ul>`;
+}
+
+/** Attach behaviour to the just-rendered page (search/sort, pagination). */
+export function bind(root) {
+  bindBoard(root);
+  bindLeaderboard(root);
 }

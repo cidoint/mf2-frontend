@@ -11,7 +11,7 @@
 // capture.
 
 import { getBounties, getBounty, getLeaderboard, getProfile } from './api.js';
-import { board, bounty, leaderboard, profile } from './views.js';
+import { board, bounty, leaderboard, profile, bind } from './views.js';
 
 const app = document.getElementById('app');
 
@@ -75,6 +75,7 @@ async function render() {
     app.innerHTML = '<p class="error">That page could not be loaded. <a href="#/">Back to the board</a></p>';
   }
 
+  bind(app);
   window.scrollTo(0, 0);
   await settled(app);
   window.__shotReady = true;
