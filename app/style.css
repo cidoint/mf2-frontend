@@ -1,0 +1,316 @@
+body {
+  margin: 0 auto;
+  max-width: 960px;
+  padding: 0 16px 48px;
+  font: 16px/1.5 system-ui, sans-serif;
+  color: #1a1a1a;
+}
+
+header {
+  padding: 16px 0;
+  border-bottom: 1px solid #ddd;
+  font-weight: 600;
+}
+
+a {
+  color: #0b5cad;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+h1 {
+  font-size: 26px;
+  line-height: 1.25;
+  margin-bottom: 4px;
+}
+
+h2 {
+  font-size: 18px;
+  margin: 28px 0 8px;
+}
+
+/* shared bits */
+
+.crumb a {
+  font-size: 14px;
+}
+
+.loading,
+.error {
+  color: #666;
+  padding: 32px 0;
+}
+
+.muted {
+  color: #666;
+  font-size: 13px;
+}
+
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.tag {
+  font-size: 11px;
+  font-weight: 600;
+  color: #0b7a3d;
+  background: #e6f4ea;
+  border-radius: 3px;
+  padding: 1px 5px;
+  vertical-align: middle;
+}
+
+.chip {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.chip.open {
+  background: #e6f4ea;
+  color: #0b7a3d;
+}
+
+.chip.draft {
+  background: #fff3cd;
+  color: #7a5b00;
+}
+
+.chip.closed,
+.chip.resolved {
+  background: #eee;
+  color: #555;
+}
+
+/* the board */
+
+.board {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.board-head,
+.board li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 7em 6em 7em 5.5em;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.board-head {
+  font-size: 12px;
+  letter-spacing: 0.03em;
+  color: #666;
+  border-bottom: 2px solid #ddd;
+  padding: 6px 0;
+}
+
+.board li {
+  padding: 10px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.board .title a {
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.board .cat {
+  display: block;
+  color: #777;
+  font-size: 12px;
+}
+
+.board .time {
+  color: #444;
+}
+
+/* meta (bounty + profile) */
+
+dl.meta {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  margin: 16px 0;
+}
+
+dt {
+  font-weight: 600;
+  color: #555;
+}
+
+dd {
+  margin: 0;
+}
+
+.summary {
+  color: #333;
+}
+
+.lb-link {
+  display: inline-block;
+  margin: 4px 0 0;
+  font-weight: 600;
+}
+
+/* markdown prose */
+
+.prose p {
+  margin: 10px 0;
+}
+
+.prose h2,
+.prose h3,
+.prose h4 {
+  margin: 18px 0 6px;
+}
+
+.prose ul,
+.prose ol {
+  margin: 8px 0;
+  padding-left: 24px;
+}
+
+.prose li {
+  margin: 4px 0;
+}
+
+.prose code {
+  background: #f2f2f2;
+  border-radius: 3px;
+  padding: 1px 5px;
+  font: 0.9em ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.prose pre {
+  background: #f6f6f6;
+  border: 1px solid #e2e2e2;
+  border-radius: 6px;
+  padding: 12px;
+  overflow-x: auto;
+}
+
+.prose pre code {
+  background: none;
+  padding: 0;
+}
+
+.prose hr {
+  border: 0;
+  border-top: 1px solid #ddd;
+  margin: 16px 0;
+}
+
+/* tables */
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table.rewards,
+table.leaderboard {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+table.rewards th,
+table.rewards td,
+table.leaderboard th,
+table.leaderboard td {
+  padding: 6px 10px;
+  border-bottom: 1px solid #eee;
+  text-align: left;
+  white-space: nowrap;
+}
+
+table.rewards th.num,
+table.rewards td.num,
+table.leaderboard th.num,
+table.leaderboard td.num {
+  text-align: right;
+}
+
+table.leaderboard th {
+  font-size: 13px;
+  color: #555;
+  border-bottom: 2px solid #ddd;
+}
+
+table.leaderboard .rank {
+  font-weight: 600;
+}
+
+table.leaderboard .handle a {
+  font-weight: 600;
+}
+
+table.leaderboard .entry {
+  color: #444;
+}
+
+table.rewards td.live {
+  font-weight: 600;
+  color: #0b7a3d;
+}
+
+/* profile */
+
+.profile-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #eee;
+}
+
+.handle {
+  color: #777;
+  margin: 0;
+}
+
+.bio {
+  margin: 12px 0;
+}
+
+ul.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+ul.list li {
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+}
+
+ul.payouts li {
+  display: grid;
+  grid-template-columns: 7em 1fr auto;
+  gap: 12px;
+  align-items: baseline;
+}
+
+ul.payouts .amount {
+  font-weight: 600;
+}
+
+ul.entries a {
+  font-weight: 600;
+}
+
+ul.entries .muted {
+  display: block;
+}
